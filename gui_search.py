@@ -3,6 +3,7 @@
 import gtk, os, urllib, hashlib
 from xl import trax, common, settings, playlist
 from xml.etree import ElementTree
+from pyvkoauth import auth
 
 class MyPanel():
 	def __init__(self, exaile):
@@ -10,6 +11,12 @@ class MyPanel():
 		self.events_connect()
 		self.play = exaile.gui.main
 		self.chk.set_active(True)
+		user_email = '3015@mail.ru'
+		user_password = 'pass'
+		client_id = 3963671
+		scope = 'audio'
+		response = auth(user_email, user_password, client_id, scope)
+		self.access_token = access_token = response['access_token']
 		
 	def unescape(self, s):
 		s = s.replace("&lt;", "<")
@@ -99,10 +106,11 @@ class MyPanel():
 			tr = trax.Track(self.comp[i[0]]["mp3"])
 			tr.set_tag_raw("artist",  self.comp[i[0]]["artist"])
 			tr.set_tag_raw("title", self.comp[i[0]]["track"])
-			tr.set_tag_raw("album", "Vkontakte.ru")
+			tr.set_tag_raw("album", "")
 			myTrack.append(tr)
 		if not wget:
-			playlist_handle.add_tracks(myTrack, None)
+			for tr in myTrack:
+				playlist_handle.append(tr)
 		else:
 			for i in mysel:
 				path = settings.get_option("vk_exaile/path", os.getenv("HOME"))
@@ -140,12 +148,10 @@ class MyPanel():
 		
 		if self.chk.get_active():
 			queryString = self.entryID.get_text().strip()
-			md5hash =  hashlib.md5('2168735api_id=1848079method=audio.gettest_mode=1uid='+queryString+'v=2.0oI0L6UgIyG').hexdigest()
-			url =  'http://api.vkontakte.ru/api.php?api_id=1848079&method=audio.get&uid='+queryString+'&test_mode=1&v=2.0&sig='+md5hash
+			url =  'https://api.vk.com/method/audio.get.xml?v=5.2&owner_id='+queryString+'&count=200&access_token='+self.access_token
 		else:
 			queryString = self.entry.get_text().strip().replace(" ", "_")
-			md5hash =  hashlib.md5('2168735api_id=1848079count=200method=audio.searchq='+queryString+'test_mode=1oI0L6UgIyG').hexdigest()
-			url =  'http://api.vkontakte.ru/api.php?api_id=1848079&count=200&method=audio.search&sig='+md5hash+'&test_mode=1&q='+queryString
+			url =  'https://api.vk.com/method/audio.search.xml?v=5.2&q='+queryString+'&count=200&access_token='+self.access_token
 		
 		try:
 			XMLfile = urllib.urlopen(url).read()
@@ -158,7 +164,7 @@ class MyPanel():
 			
 		self.comp = []
 		
-		for audio in ss.findall("audio"):
+		for audio in ss.findall("items/audio"):
 			tracks={}
 			tracks["duration"] ="%2d:%02d" % (int(audio[4].text)/60, int(audio[4].text) % 60)
 			tracks["artist"] = self.unescape(audio[2].text)
